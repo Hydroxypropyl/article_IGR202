@@ -1,0 +1,10 @@
+# Norris & al, 2013
+Employés de Disney.
+Enjeu autour de la facilitation de l'animation : inbetweening = compléter des frames entre les dessins principaux histoire d'avoir une animation fluide.
+
+Gros enjeu de la vectorisatio : les jonctions (T et X). Notamment parce que leur bonne détection dépend d'une analyse plus globale pour comprendre la structure des différents traits constituant la jonction.
+
+Algo : 
+- topologie extraite via un gradient-based pixel clustering : on veut que les 'strokes' ne soient plus ambigues
+- reverse drawing : obtenir la configuration la plus crédible de 'strokes' pour les différentes jonctions.
+- intervention de l'utilisateurice possible afin de modifier l'interprétation des jonctions pour une restitution plus fidèle du dessin original.
