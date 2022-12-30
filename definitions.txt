@@ -1,0 +1,8 @@
+Bitmap : 
+Bézier curve : 
+parametric curves : 
+hypergraph : set of nodes and hyperedges.
+hyperedge : set of edges. Extra constraint here is that those edges must be a sequence of adjacent edges in the initial topology in order to recreate continuous lines.
+morphological thinning : https://fr.wikipedia.org/wiki/Squelettisation_(informatique)
+trapped-ball segmentation algorithm :
+
