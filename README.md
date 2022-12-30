@@ -13,12 +13,14 @@ dimanche 29/01/2023
 Ce projet compte pour 70% de la note finale.
 
 Celle-ci est découpée de la manière suivante : 
+
 * 20% pour l'analyse de la littérature existante (état de l'art)
 * 20% pour l'implémentation
 * 30% pour la présentation finale, en classe
 
 ## Contenu de la présentation finale
 La présentation finale doit inclure : 
+
 * une présentation de l'état de l'art
 * notre algorithme
 * nos résultats obtenus
