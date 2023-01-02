@@ -2,9 +2,12 @@
 Employés de Disney.
 Enjeu autour de la facilitation de l'animation : inbetweening = compléter des frames entre les dessins principaux histoire d'avoir une animation fluide.
 
-Gros enjeu de la vectorisatio : les jonctions (T et X). Notamment parce que leur bonne détection dépend d'une analyse plus globale pour comprendre la structure des différents traits constituant la jonction.
+Gros enjeu de la vectorisation : les jonctions (T et X). Notamment parce que leur bonne détection dépend d'une analyse plus globale pour comprendre la structure des différents traits constituant la jonction.
 
 Algo : 
-- topologie extraite via un gradient-based pixel clustering : on veut que les 'strokes' ne soient plus ambigues
-- reverse drawing : obtenir la configuration la plus crédible de 'strokes' pour les différentes jonctions.
+- désambiguation des traits via du clustering: on veut que les 'strokes' ne soient plus ambigues. Le gradient est utilisé dans la mesure où quand on trace une ligne (noire par exemple), plus les pixels sont foncés plus on se trouve proche du centre de la ligne en question. Gradient élevé = plus probable d'indiquer la position de la ligne centrale. pixels classés selon si leur gradient est au-dessus d'un certain seuil ou non, celui-ci devant être > au bruit de l'image.
+- extraire la topologie : les pixels sont regroupés sous forme d'un graphe de cluster et on fait un algo de minimum spanning tree pour trouver le squelette topologique. Puis on vire les sommets qui sont des feuilles et ne donnent pas vraiment d'information sur la structure du squelette
+- center line reconstruction : obtenir la configuration la plus crédible de 'strokes' pour les différentes jonctions, auxquelles il faut faire particulièrement attention pour que le dessin ressemble à quelque chose. On fait l'hypothèse que c'est plus crédible d'avoir des lignes plutôt smooth qui se croisent plutôt que des angles prononcés. La ligne de base est calculée en cherchant les plus courts chemins entre les jonctions ou les fins de traits. 
+La trajectoire est ensuite adaptée en prenant en compte les barycentres des clusters
+- reverse drawing : pour les jonctions ambigues, on fait grandir un cercle centrée sur cette jonction jusqu'à ce que les traits ne se chevauchent plus. On va ensuite favoriser les lignes droites plutot que celles avec une courbure élevée.
 - intervention de l'utilisateurice possible afin de modifier l'interprétation des jonctions pour une restitution plus fidèle du dessin original.
