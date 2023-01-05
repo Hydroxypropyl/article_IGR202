@@ -1,0 +1,22 @@
+=== semaine du 02 janvier au 08 janvier
+
+TODO : lecture et résumé des 4 articles complémentaires pour l'état de l'art.
+TODO : définition des différents termes employés.
+
+=== semaine du 09 janvier au 15 janvier
+
+TODO : implémentation de 4.1
+
+=== semaine du 16 janvier au 22 janvier
+
+=== semaine du 23 janvier au 29 janvier
+
+=== semaine du 30 janvier au 5 février
+
+TODO : rédaction d'un rapport bilan
+TODO : diapositives pour la présentation orale.
+
+
+
+
+**** 6 février : présentation finale ****
