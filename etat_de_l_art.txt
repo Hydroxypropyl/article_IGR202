@@ -1,4 +1,4 @@
-# Norris & al, 2013
+# Noris & al, 2013
 Employés de Disney.
 Enjeu autour de la facilitation de l'animation : inbetweening = compléter des frames entre les dessins principaux histoire d'avoir une animation fluide.
 
@@ -11,3 +11,69 @@ Algo :
 La trajectoire est ensuite adaptée en prenant en compte les barycentres des clusters
 - reverse drawing : pour les jonctions ambigues, on fait grandir un cercle centrée sur cette jonction jusqu'à ce que les traits ne se chevauchent plus. On va ensuite favoriser les lignes droites plutot que celles avec une courbure élevée.
 - intervention de l'utilisateurice possible afin de modifier l'interprétation des jonctions pour une restitution plus fidèle du dessin original.
+
+#Mikhail Bessmeltsev & Justin Solomon, "Vectorization of Line Drawings via PolyVector Fields, 2018
+
+- bitmap images
+- focuses on handling junctions properly to have a good connectivity : especially important for a good understanding of the object topology by the human eye.
+In cartoon animation, bad junctions mean temporal incoherence and make modern automatic coloring of in-betweening tools unusable.
+In engineering, may create unrealistic objects from a physics perspective.
+
+Analysis of Favreau results : good results when many overlapping strokes but when aiming for fidelity, the drawings often end up oversimplified drawings deviating quite a bit from the initial contours of the image.
+
+Focus on X and T junctions, the latter being often found in occlusion contours, so crucial to 3D shape perception.
+
+Goal : find a smooth frame field on the image where the directions locally approximate the curve and where the two vectors approximate the two strokes on junctions. 
+To the authors' knowledge, frame fields hadn't been used before for image vectorization.
+
+- Fram fields offer more freedom in the direction and length of the vectors than cross fields.
+- Image vectorization : when a lot of noise, tend to try to simplify the curves, but may not want this effect on higher quality drawings. Line of work close to their method : using tangent fields for image processing and vectorization. Main issue with this in this case is that tangent fields cannot capture multiple directions and therefore aren't of any help to disambiguate junctions.
+- corner and junction detection : corner detection is classic in computer vision, but relies on local information. Here, for junctions, what we really want is to be able to pinpoint precisely the centre of the junction and estimate the directions of the strokes robustely.
+
+=> article uses fram fiels which are a bit more natural to track junctions : effectively disambiguates T and X junctions and is resistant to noise.
+
+Algo : 
+- design the frame field : 
+    - threshold image to get line pixels.
+    - (u,v) corresponds to the tangents of the curve near each pixel. At junctions, they should align each with one of the strokes.
+    - resolve a variational problem depending on three terms : 
+        - one for alignment : enforces alignment to the tangent of the nearby curves.
+        - smoothness : Dirichlet energy term
+        - regularization : away from junctions there is only one proeminent direction. The algorithm favors the direction that is perpendicular to the noise tangent
+    - to optimize the process, the frame field calculation is only done for the pixels belonging to the lines, based on the 'narrow band' level set methods.
+- extracting the drawing topology:
+    - trace frame field, create curve bundles
+    - away from junction, chose the direction with maximum magnitude and trace along that one until it get close enough to another line with same tangent or when it is too far from the narrow band around the lines.
+    - group the lines that are part of a same stroke : the center line is computed and then we look perpendicularely to it and all the intersections with the lines 
+    part of the stroke are considered as one big vertex and the centerline is the edge joining it to the next bundle of intersections computed the same way. 
+    Lines are considered part of the same stroke if they are less than one pixel apart.
+    - topology simplification : 
+        - if fake loops have been created, they will be flattened by checking the amount of white pixels in it.
+        - if extranenous branches at vertices with valence >2, detected by checking how much of the shortest branch is actually outside the strokes 
+        formed by other branches.
+        If too short, it is pruned.
+    -disambiguating parallel lines : look for parts where there are valence 2 vertices with on each side of the portion valence 3 vertices. 
+    The middle portion is then unzipped. 
+    Since vertices represent curves with the same direction, at X junctions, there is actually no vertex shared by the two strokes, 
+    so those junctions are not falsely disambiguated.
+- vectorization : 
+    - for each vertex (which are a bundle of intersection, see above), the barycenter is chosen as the representative. Then, between each new vertex, we chose the lines closest to the center line, and we can hop from one line to another, joining them by short straight lines which will be smoothened afterwards. The calculation is done such that joining lines far from one another is penalized and joining vertices that are far from the center line too.
+    - valence 3 vertices are those where two strokes meet in an almost parallel way : calculation is made in order to have a merging as smooth as possible.
+    - for T junctions : strokes are drawn independently and therefore could continue a bit after the junction. so the intersection is added to the graph and the
+    leaves are pruned in the same way it is done in the topology simplification 2nd step.
+    
+Comparison with Favreau et al. : consider it complementary to their work. Favreau is good when significant simplification is needed;
+
+#PolyVector Flow, 2021
+
+Compute key points : junctions, curve, endpoints, and sharp corners and connecting these keypoints using their inferred type.
+Y-junctions are computed later on through PolyVector Flow.
+Use fully supervised deep learning methods. Is then used to generate heatmaps indicating the likelihood of any keypoint, then more specific ones for junctions, endpoints and sharp corners.
+- graph construction is done based on the previous article.
+- then they look for solutions that pass through all the keypoints. First, they look for the vertices corresponding to those keypoints, for T and X junctions they look for 2 vertices as those strokes are at this step still independent.Then a subgraph is extracted from all the different lines in a stroke to connect all the keypoints.
+
+Better than previous methods especially when looking at sharp details.
+Downfalls might be the dependency of the method on previous ones and tools that may be sensitive to noise.
+    
+    
+

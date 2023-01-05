@@ -6,3 +6,6 @@ hyperedge : set of edges. Extra constraint here is that those edges must be a se
 morphological thinning : https://fr.wikipedia.org/wiki/Squelettisation_(informatique)
 trapped-ball segmentation algorithm :
 
+#Bellmetsev, 2018
+Frame field : en chaque pixel de l'image, on associe deux vecteurs qui vont caractériser la direction en ce pixel.
+
