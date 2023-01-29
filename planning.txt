@@ -1,7 +1,7 @@
 === semaine du 02 janvier au 08 janvier
 
-TODO : lecture et résumé des 4 articles complémentaires pour l'état de l'art.
-TODO : définition des différents termes employés.
+TODO : lecture et résumé des 4 articles complémentaires pour l'état de l'art. DONE
+TODO : définition des différents termes employés. DONE
 
 === semaine du 09 janvier au 15 janvier
 
