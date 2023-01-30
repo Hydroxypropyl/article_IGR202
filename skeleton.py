@@ -9,6 +9,7 @@ from skimage.morphology import dilation
 from skimage.morphology import rectangle
 from skimage.morphology import diamond
 import skimage.io
+from itertools import islice
 
 def get_skeleton(img) :
     """
@@ -218,36 +219,50 @@ def build_graph(skeleton, junction_coordinates : list):
                 n2 = [(i-1, j-1), (i+1, j-1), (i-1, j+1), (i+1,j+1)]
                 for n in n1 : 
                     if skeleton[n[0], n[1]] == 255 : 
-                        G.add_edge(i*width+j, n[0]*width+n[1], weight = 1)
+                        G.add_edge(i*width+j, n[0]*width+n[1], weight = 1000000)
+                        #G.add_edge(n[0]*width+n[1],i*width+j,  weight = 10001)
                 for n in n2 : 
-                    if skeleton[n[0], n[1]] == 255 : 
-                        #diagonale must be penalizsd in order to favor neighbours in 4-connexity
-                        G.add_edge(i*width+j, n[0]*width+n[1], weight = 3)
+                    if skeleton[n[0], n[1]] == 400 : 
+                        #diagonale must be penalised in order to favor neighbours in 4-connexity
+                        G.add_edge(i*width+j, n[0]*width+n[1], weight = 10003)
+                        G.add_edge(n[0]*width+n[1],i*width+j,  weight = 10003)
     return G, junction_indices
 
 def get_edges(G, junction_indices) :
     edges_list = []
-    for i in range(len(junction_indices)-1):
+    for i in range(len(junction_indices)):
         print("junction {}".format(i))
         edges = []
         source = junction_indices[i]
+
         for j in range(i+1, len(junction_indices)):
             target = junction_indices[j]
-            if nx.has_path(G, source, target) :
-                #paths = nx.all_simple_paths(G, source, target, 400)
-                print("found all paths :  ")
-                i = 0
-                print("here and")
-                for path in nx.all_simple_paths(G, source, target, 200) : 
-                    print("there")
-                    print(i)
-                    i += 1
-                    if set(set(junction_indices) & set(path)) == set([source, target]) : 
-                        #true edge : it doesn't pass by another junction
-                        print("adding...")
-                        edges.append(path)
-                        print("added!")
-        edges_list.append(edges)
+            if target != source : 
+                #print("target :", target, "source : ", source)
+                for neighbour in nx.neighbors(G, source) :
+                    #print('neighbour : ', neighbour)
+
+                    G.edges[source,neighbour]["weight"] = 1
+                    #G.edges[neighbour,source]["weight"] -= 10000
+
+                    if nx.has_path(G, source, target) :
+                        #print("there is a path")
+                        #path = nx.dijkstra_path(G, neighbour, target, weight="weight")
+                        #if set(set(junction_indices) & set(path)) == set([target, source]) : 
+                            #true edge : it doesn't pass by another junction
+                        paths = nx.all_simple_paths(G,source=source, target=target)
+                        for path in paths : 
+                            if set(set(junction_indices) & set(path)) == set([target, source]) : 
+                                print("adding {} and {}...".format(source, target))
+                                edges.append(path)
+                                #print("added!")
+ 
+                    G.edges[source,neighbour]["weight"] = 1000000
+                    #G.edges[neighbour, source]["weight"] += 10000
+                #print("found {} edges".format(len(edges)))
+        if len(edges) > 0 : 
+            edges_list.append(edges)
+    print("total : ", np.sum(len(edges_list[i]) for i in range(len(edges_list))))
     return edges_list
 
 
@@ -290,21 +305,25 @@ def get_control_points_bezier(edge : list, P0 : int, P3 : int, width : int) -> l
     y0 = P0%width
     x3 = P3//width
     y3 = P3%width
-    extrema = local_extrema(edge, P0, P3, width)
-    print(P0, P3, extrema)
-    xm = extrema[0]
-    ym = extrema[1]
+    if len(edge) > 5:
+        extrema = local_extrema(edge, P0, P3, width)
+        #print(P0, P3, extrema)
+        xm = extrema[0]
+        ym = extrema[1]
 
-    d01 = np.sqrt((xm-x0)**2 + (ym-y0)**2)
-    d12 = np.sqrt((x3-xm)**2 + (y3-ym)**2)
-    fa = smoothness*d01/(d01+d12)
-    fb = smoothness*d12/(d01+d12) 
-    p1x = xm - fa*(x3-x0) 
-    p1y = ym - fa*(y3-y0)  
-    p2x = xm + fb*(x3-x0)
-    p2y = ym + fb*(y3-y0)  
-    coordinates.append((p1x, p1y))
-    coordinates.append((p2x, p2y))
+        d01 = np.sqrt((xm-x0)**2 + (ym-y0)**2)
+        d12 = np.sqrt((x3-xm)**2 + (y3-ym)**2)
+        fa = smoothness*d01/(d01+d12)
+        fb = smoothness*d12/(d01+d12) 
+        p1x = xm - fa*(x3-x0) 
+        p1y = ym - fa*(y3-y0)  
+        p2x = xm + fb*(x3-x0)
+        p2y = ym + fb*(y3-y0)  
+        coordinates.append((p1x, p1y))
+        coordinates.append((p2x, p2y))
+    else : 
+        coordinates.append((x0, y0))
+        coordinates.append((x3,y3))
     coordinates.append((x3, y3))
     return coordinates
 
@@ -373,25 +392,26 @@ def fit_bezier_curve(edge : list, start :int, end : int, junction_coordinates :l
     Returns : 
     --------------------
     `junction_coordinates` : the updated junction coordinates such that the fitting error of all Bezier curve is less than 2 pixels."""
-    if len(edge)> 3 :     
+    if len(edge)> 4 :     
         control_points = get_control_points_bezier(edge, start, end, width)
         err = fitting_error(edge, control_points, width)
         #print(err)
-        if err > 20 :
+        if err > 10 :
             min_err = err
             split_index = 0
             for i in range(2,len(edge)-2) :
                 err1 = fitting_error(edge[:i+1], get_control_points_bezier(edge[:i+1], edge[0], edge[i], width), width)
                 err2 = fitting_error(edge[i:], get_control_points_bezier(edge[i:], edge[i], edge[-1], width), width)
-                print("err1 {}, err {}".format(err1 + err2, min_err))
+                #print("err1 {}, err {}".format(err1 + err2, min_err))
                 if err1 + err2 < min_err :
                     split_index = i
                     min_err = err1 + err2
             split_point = edge[split_index]
-            print(split_point)
+            #print(split_point)
             junction_coordinates.append((split_point//width, split_point%width))
-            fit_bezier_curve(edge[:split_index+1], start, split_point, junction_coordinates, width)
-            fit_bezier_curve(edge[split_index:], split_point, end, junction_coordinates, width)
+            if split_point != start and split_point != end : 
+                fit_bezier_curve(edge[:split_index+1], start, split_point, junction_coordinates, width)
+                fit_bezier_curve(edge[split_index:], split_point, end, junction_coordinates, width)
     return junction_coordinates
 
 
@@ -426,14 +446,21 @@ def topological_graph(skeleton) -> tuple[list, list] :
     #junction_neighbours, edges_list = get_neighbours_and_edges(skeleton, nodes_coordinates)
     G, junctions_indices = build_graph(skeleton, nodes_coordinates)
     edges_list = get_edges(G, junctions_indices)
+    new_img = np.zeros(skeleton.shape)
+    for edges in edges_list :
+        for edge in edges : 
+            for pixel in edge : 
+                new_img[pixel//width, pixel%width] = 255
+    plt.imshow(new_img)
+    plt.show()
     print("Done.")
     new_nodes_coordinates = nodes_coordinates.copy()
     n = len(nodes_coordinates)
     for i in range(len(edges_list)) :
-        start = junctions_indices[i]
         print("fitting edge {} out of {}".format(i, n))
         edges = edges_list[i]
         for edge in edges : 
+            start = edge[0]
             print("edge size : ", len(edge))
             new_nodes_coordinates = fit_bezier_curve(edge, start, edge[-1], new_nodes_coordinates, width)
     #nodes_neighbours, edges_list = get_neighbours_and_edges(skeleton, new_nodes_coordinates)
@@ -444,13 +471,15 @@ def topological_graph(skeleton) -> tuple[list, list] :
 
 
 def test() :
-    name = 'boule'
+    name = 'plot'
     image = cv.imread("results/" + name +"_no_contour.png")
     image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 
     skeleton = get_skeleton(image)
     plt.imshow(skeleton, cmap='gray')
     plt.show()
+
+    cv.imwrite("results/"+name+"_skeleton.png", skeleton)
 
     nodes_coordinates = topological_graph(skeleton)
     new_img = np.zeros(skeleton.shape)
