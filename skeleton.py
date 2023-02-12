@@ -11,6 +11,10 @@ from skimage.morphology import diamond
 import skimage.io
 from itertools import islice
 
+#### debugging variables
+debugging_bezier = False
+debugging_final_edges = False
+
 def get_skeleton(img) :
     """
     This function takes as input the trapped ball segmented image. It then computes the skeleton by intersecting iteratively all the zones.
@@ -159,13 +163,12 @@ def get_neighbours_and_edges(skeleton, junction_coordinates : list) -> tuple[lis
         j = 1
         print("{} potential edges to check.".format(nb_potential_edges))
         for n in range(nb_potential_edges) : 
-            visited = np.zeros(skeleton.shape)
             edge = [junction[0]*width +junction[1], junction_neighbours[n][0]*width + junction_neighbours[n][1]]
 
             j += 1
             not_edge = False
             last_neighbour = (edge[-2]//width, edge[-2]%width)
-            while is_junction(skeleton, (edge[-1]//width, edge[-1]%width)) == False and not_edge == False :
+            while (edge[-1]//width, edge[-1]%width) not in junction_coordinates and not_edge == False :
                 #find neighbour of latest pixel of edge
                 
                 pixel = edge[-1]
@@ -176,15 +179,13 @@ def get_neighbours_and_edges(skeleton, junction_coordinates : list) -> tuple[lis
                     print("{} is in edge but has {} neighbours".format(pixel, len(neighbours)))
                     print(skeleton[pixel//width-1:pixel//width+2, pixel%width-1:pixel%width+2])
                     not_edge = True
-                    
                 else : 
                     #print(neighbours, pixel, "last", last_neighbour)
                     #print(skeleton[pixel//width-1:pixel//width+2, pixel%width-1:pixel%width+2])
                     for nbr in neighbours :
-                        if nbr != last_neighbour and visited[nbr[0], nbr[1]] == 0:
+                        if nbr != last_neighbour:
                             #print(nbr, edge[-2])
                             edge.append(nbr[0]*width + nbr[1])
-                            visited[nbr[0], nbr[1]] = 1
                 last_neighbour = (pixel//width, pixel%width)
             if not not_edge :
                 edges.append(edge)
@@ -279,17 +280,23 @@ def local_extrema(edge : list, start : int, end : int, width : int) :
     Takes the segment going from `start` and `end` and gets the point in """
     max_dist = 0
     extrema = (start//width, start%width)
-    ux = end//width - start//width
-    uy = end%width - start%width
+    y_extr = start//width
+    x_extr = start%width
+    uy = abs(end//width - start//width)
+    ux = abs(end%width - start%width)
     norm_u = np.sqrt(ux**2 + uy**2)
     if norm_u > 0 :
         for point in edge : 
-            vx = point//width - start//width
-            vy = point%width - start%width
-            dist = (ux*vy - uy*vx)/norm_u
-            if dist > max_dist : 
-                extrema = (point//width, point%width)
+            vy = abs(point//width - start//width)
+            vx = abs(point%width - start%width)
+            dist = abs(ux*vy - uy*vx)/norm_u #getting the distance between a point and a line through cross product
+            if (dist > max_dist) or (dist ==  max_dist and y_extr + x_extr > point//width + point%width): 
+                y_extr = point//width
+                x_extr = point%width
+                extrema = (y_extr, x_extr)
                 max_dist = dist
+
+    #print("local extrema : ", extrema)
     return extrema
 
 
@@ -300,8 +307,8 @@ def get_control_points_bezier(edge : list, P0 : int, P3 : int, width : int) -> l
     Parameters : 
     ----------------
     `edge` : list of coordinates of pixels belonging to the edge
-    `P0` : start point
-    `P3` : end point
+    `P0` : start point coordinates in flattened image
+    `P3` : end point coordinates in flattened image
     
     Returns : 
     ----------------
@@ -310,30 +317,37 @@ def get_control_points_bezier(edge : list, P0 : int, P3 : int, width : int) -> l
     coordinates = [(P0//width, P0%width)]
 
     smoothness = 0.3
-    x0 = P0//width
-    y0 = P0%width
-    x3 = P3//width
-    y3 = P3%width
+    y0 = P0//width
+    x0 = P0%width
+    y3 = P3//width
+    x3 = P3%width
     if len(edge) > 5:
         extrema = local_extrema(edge, P0, P3, width)
-        #print(P0, P3, extrema)
-        xm = extrema[0]
-        ym = extrema[1]
-
-        d01 = np.sqrt((xm-x0)**2 + (ym-y0)**2)
-        d12 = np.sqrt((x3-xm)**2 + (y3-ym)**2)
+        #print("P0, P3, extrema", P0, P3, extrema)
+        ym = extrema[0]
+        xm = extrema[1]
+        if np.sqrt(x3**2+y3**2) < np.sqrt(x0**2 + y0**2) : 
+        #tackles the issue of the edges being oriented, 
+        # always compute the bezier curve by considering the vertex closest to origin as the starting point
+            d12 = np.sqrt((ym-y0)**2 + (xm-x0)**2)
+            d01 = np.sqrt((y3-ym)**2 + (x3-xm)**2)
+        else : 
+            d01 = np.sqrt((ym-y0)**2 + (xm-x0)**2)
+            d12 = np.sqrt((y3-ym)**2 + (x3-xm)**2)
         fa = smoothness*d01/(d01+d12)
         fb = smoothness*d12/(d01+d12) 
-        p1x = xm - fa*(x3-x0) 
-        p1y = ym - fa*(y3-y0)  
-        p2x = xm + fb*(x3-x0)
-        p2y = ym + fb*(y3-y0)  
-        coordinates.append((p1x, p1y))
-        coordinates.append((p2x, p2y))
+        p1x = xm - fa*abs(x3-x0) 
+        p1y = ym - fa*abs(y3-y0)  
+        p2x = xm + fb*abs(x3-x0)
+        p2y = ym + fb*abs(y3-y0)  
+        #print("d01 {} d12 {} fa {} fb {} p1x {} p1y {} p2x {} p2y {}".format(d01, d12, fa, fb, p1x, p1y, p2x, p2y))
+
+        coordinates.append((p1y, p1x))
+        coordinates.append((p2y, p2x))
     else : 
-        coordinates.append((x0, y0))
-        coordinates.append((x3,y3))
-    coordinates.append((x3, y3))
+        coordinates.append((y0, x0))
+        coordinates.append((y3,x3))
+    coordinates.append((y3, x3))
     return coordinates
 
 
@@ -354,8 +368,15 @@ def bezier_curve(tp : tuple, control_points : list):
     p1 = control_points[1]
     p2 = control_points[2]
     p3 = control_points[3]
-    x = (1-tp)**3*p0[0] + 3*tp*(1-tp)**2*p1[0] + 3*tp**2*(1-tp)*p2[0] + tp**3*p3[0]
-    y = (1-tp)**3*p0[1] + 3*tp*(1-tp)**2*p1[1] + 3*tp**2*(1-tp)*p2[1] + tp**3*p3[1]
+    #since edges are oriented in my construction (exist 2 times) 
+    # I must get the same bezier curve for both edges and that means choosing one configuration for the polynom
+    # I decide to always take the one obtained with the edge whose starting point is the closest to the origin
+    if np.sqrt(p0[0]**2 + p0[1]**2) < np.sqrt(p3[0]**2+p3[1]**2):
+        x = (1-tp)**3*p0[0] + 3*tp*(1-tp)**2*p1[0] + 3*tp**2*(1-tp)*p2[0] + tp**3*p3[0]
+        y = (1-tp)**3*p0[1] + 3*tp*(1-tp)**2*p1[1] + 3*tp**2*(1-tp)*p2[1] + tp**3*p3[1]
+    else : 
+        x = (1-tp)**3*p3[0] + 3*tp*(1-tp)**2*p1[0] + 3*tp**2*(1-tp)*p2[0] + tp**3*p0[0]
+        y = (1-tp)**3*p3[1] + 3*tp*(1-tp)**2*p1[1] + 3*tp**2*(1-tp)*p2[1] + tp**3*p0[1]
     return (x,y)
 
 
@@ -371,14 +392,30 @@ def compute_bezier_curve(edges_list, junctions_indices, width):
     curve = [[],[]]
     for P0 in range(len(junctions_indices)) :
         edges = edges_list[P0]
+        #print(len(edges))
         for edge in edges :
+            x = []
+            y = []
             if len(edge)>2:
                 control_points = get_control_points_bezier(edge, edge[0], edge[-1], width)
                 norm = len(edge)
                 for i in range(norm) :
                     tp =i/norm
-                    curve[0].append(bezier_curve(tp, control_points)[0])
-                    curve[1].append(bezier_curve(tp, control_points)[1])
+                    bezier = bezier_curve(tp, control_points)
+                    x.append(bezier[1])
+                    y.append(bezier[0])
+                    curve[0].append(bezier[0])
+                    curve[1].append(bezier[1])
+            if debugging_bezier == True :
+                plt.plot(x, y, 'bo', ms = 1)
+                plt.plot([control_points[0][1], control_points[3][1]], [control_points[0][0], control_points[3][0] ], 'ro', ms = 5)
+                plt.plot([control_points[1][1], control_points[2][1]], [control_points[1][0], control_points[2][0] ], 'go', ms = 5)
+                ax = plt.gca()
+                ax.set_xlim(0,width)
+                ax.set_ylim(width,0)
+                ax.set_aspect('equal', adjustable='box')        
+                plt.show()
+
     return curve
 
 
@@ -413,7 +450,7 @@ def fitting_error(edge : list, control_points : list, width : int) -> float:
     return sum
 
 
-def fit_bezier_curve(edge : list, start :int, end : int, junction_coordinates :list, width : int, threshold = 10) -> list :
+def fit_bezier_curve(edge : list, start :int, end : int, junction_coordinates :list, width : int, threshold = 300) -> list :
     """
     Takes `edge` and recursively fits Bezier curve on different segments by splitting in new segments, in order to get a fitting error below `threshold`.
     Parameters : 
@@ -430,7 +467,7 @@ def fit_bezier_curve(edge : list, start :int, end : int, junction_coordinates :l
     `junction_coordinates` : the updated junction coordinates such that the fitting error of all Bezier curve is less than 2 pixels.
     """
 
-    if len(edge)> 4 :     
+    if len(edge)> 10 :     
         control_points = get_control_points_bezier(edge, start, end, width)
         err = fitting_error(edge, control_points, width)
         #print(err)
@@ -478,7 +515,7 @@ def topological_graph(skeleton, name) -> tuple[list, list] :
     for node in nodes_coordinates :
         new_img[node[0], node[1]] = 255
     plt.imshow(new_img, cmap="gray")
-    plt.title("junctions")
+    plt.title("junctions : {} identified".format(len(nodes_coordinates)))
     plt.show()
     cv.imwrite("results/"+name+"_initial_junctions.png", new_img)
 
@@ -489,6 +526,11 @@ def topological_graph(skeleton, name) -> tuple[list, list] :
     G, junctions_indices = build_graph(skeleton, nodes_coordinates)
     #edges_list = get_edges(G, junctions_indices)
     edges_list = get_neighbours_and_edges(skeleton, nodes_coordinates)
+    #### Check number of final edges
+    size = 0
+    for edge_list in edges_list :
+        size += len(edge_list)
+    print("initial number of edges : ", size, " junctions : ", len(junctions_indices))
     new_img = np.zeros(skeleton.shape)
     for edges in edges_list :
         for edge in edges : 
@@ -517,7 +559,7 @@ def topological_graph(skeleton, name) -> tuple[list, list] :
 
 
 def test() :
-    name = 'tree'
+    name = 'dino'
     image = cv.imread("results/" + name +"_no_contour.png")
     image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 
@@ -529,7 +571,35 @@ def test() :
     cv.imwrite("results/"+name+"_skeleton.png", skeleton)
 
     nodes_coordinates, edges_list, junctions_indices = topological_graph(skeleton, name)
-    
+
+#### Check number of final edges
+    if debugging_final_edges : 
+        nodes_coordinates = np.array(nodes_coordinates)
+        size = 0
+        max = 1
+        nb = 1
+        for edge_list in edges_list :
+            size += len(edge_list)
+            if size == max : 
+                nb += 1
+            if len(edge_list) > max : 
+                nb = 1
+                max = size
+        print("final number of edges and junction and max nb neighbours: {} {} {} {}".format(size, len(junctions_indices), max, nb))
+        fig = plt.figure()
+        for edge_list in edges_list :
+            for edge in edge_list :
+                for point in edge : 
+                    plt.plot(point%len(skeleton[0]), point//len(skeleton[0]), 'bo', ms = 1)
+                
+                plt.plot(nodes_coordinates[:,1], nodes_coordinates[:,0], 'ro', ms = 1)
+                ax = plt.gca()
+                ax.set_xlim(0,len(skeleton[0]))
+                ax.set_ylim(len(skeleton),0)
+                ax.set_aspect('equal', adjustable='box')
+                ax.set_title("final edges")
+                plt.show()
+
 
     new_img = np.zeros(skeleton.shape)
     for node in nodes_coordinates :
@@ -539,17 +609,56 @@ def test() :
     plt.show()
     cv.imwrite("results/"+name+"_nodes_bezier.png", new_img)
     curves = compute_bezier_curve(edges_list, junctions_indices, len(skeleton[0]))
-    plt.plot(curves[1], curves[0], 'ro', linewidth=1)
+    fig = plt.figure()
+    plt.plot(curves[1], curves[0], 'bo', ms=0.08)
     ax = plt.gca()
-    ax.invert_yaxis()
+    ax.set_xlim(0,len(skeleton[0]))
+    ax.set_ylim(len(skeleton),0)
+    ax.set_aspect('equal', adjustable='box')
     plt.title("bezier curves")
-    plt.show()
     plt.savefig("results/"+name+"_bezier_curves.png")
+    plt.show()
 
 test()
 
 
+###debug control points and Bezier
 
+def debug_bezier() :
+    img = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0] for i in range(10)]
+    img[1] = [1, 1, 1, 0, 0, 0, 0, 0, 0, 0]
+    img[2] = [1, 0, 1, 1, 0, 0, 0, 0, 0, 0]
+    img[3] = [1, 0, 0, 1, 1, 0, 0, 0, 0, 0]
+    img[4] = [1, 0, 0, 0, 1, 1, 0, 0, 0, 0]
+    img[5] = [1, 0, 0, 0, 0, 1, 1, 0, 0, 0]
+    img[6] = [1, 0, 0, 0, 0, 0, 1, 1, 0, 0]
+    plt.imshow(img)
+    plt.show()
+
+    edge = [61, 51, 41, 31, 21, 11, 12, 13, 23, 24, 34, 35, 45, 46, 56, 57, 67, 68]
+    edges_list = [[[61, 51, 41, 31, 21, 11, 12, 13, 23, 24, 34, 35, 45, 46, 56, 57, 67, 68]]]
+    edge.reverse()
+    edges_list.append([edge])
+    print(edges_list)
+    points = get_control_points_bezier(edge, 68, 61, 10)
+    print("points for reversed :", points)
+    points2 = get_control_points_bezier(edges_list[0][0], 61, 68, 10)
+    print("points : ", points2)
+    curves = compute_bezier_curve(edges_list, [61, 68], 10)
+    fig = plt.figure()
+    n = len(curves[0])//2
+    plt.plot(curves[1][0:n], curves[0][0:n], 'bo', ms=1)
+    plt.plot(curves[1][n:], curves[0][n:], 'ro', ms=1)
+    plt.plot(points[1], points[0], 'go', ms = 8)
+    plt.plot(points2[1], points2[0], 'co', ms = 8)
+    ax = plt.gca()
+    ax.set_xlim(0,10)
+    ax.set_ylim(10,0)
+    ax.set_aspect('equal', adjustable='box')
+    plt.title("bezier curves")
+    plt.show()
+
+#debug_bezier()
 
 
 
