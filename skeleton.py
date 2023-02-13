@@ -559,7 +559,7 @@ def topological_graph(skeleton, name) -> tuple[list, list] :
 
 
 def test() :
-    name = 'dino'
+    name = 'coffee_machine'
     image = cv.imread("results/" + name +"_no_contour.png")
     image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 
