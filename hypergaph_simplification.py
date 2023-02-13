@@ -7,7 +7,7 @@ H = [(3, 2), (2, 14), (14,7)]
 tuple (i,j) : where i is the start point and j the end point. (i,j) can be found in edges_list[i] such that edge[-1] == j
 """
 
-def fidelity_energy(skeleton, hyperedges : list) :
+def fidelity_energy(skeleton, hyperedges : list, edges_list) :
     """
     Takes as input 
     
@@ -25,10 +25,17 @@ def fidelity_energy(skeleton, hyperedges : list) :
     energy = 0
     for hyperedge in hyperedges : 
         i, j = hyperedge
+        hyperedge = hyperedges[i][j]
+        P0 = hyperedge[0]
+        P3 = hyperedge[-1]
         edge = 0
-        edge = hyperedges[i][j]
-        P0 = edge[0]
-        P3 = edge[-1]
+        for e in edges_list[i]:
+            if e[-1] == j :
+                edge = e
+                break
+        if edge == 0 : 
+            raise Exception("issue while finding the corresponding edge ({},{}).".format(i,j))
+            exit(0)
         control_points = skeleton.get_control_points_bezier(edge, P0, P3, width)
         energy += skeleton.fitting_error(edge, control_points, width)
     return energy
@@ -70,7 +77,7 @@ def trade_off_energy(skeleton, hyperedges : list, mu : float, alpha : float, deg
     return (1-alpha)*fidelity_energy(skeleton, hyperedges) + alpha*simplificity_energy(degrees, mu)
 
 
-def merge_and_split(hyperedges: list, degrees : list, edges_list, max_changes = 15) :
+def merge_and_split(hyperedges: list, degrees : list, edges_list : list, max_changes = 15) -> tuple[list, list] :
     """
     Randomly merges or splits a random number of hyperedges.
     
@@ -152,7 +159,7 @@ def merge_and_split(hyperedges: list, degrees : list, edges_list, max_changes = 
     return hyperedges, degrees
 
 
-def degree_switch(degrees, proba):
+def degree_switch(degrees : list, proba : float) -> list:
     """
     For each degree in `degrees`, there is a probibility inferior to `proba` that its value will be recomputed, by being randomly generated in {1, 2, 3}.
     
@@ -196,16 +203,64 @@ def overlap_and_dissociation(hyperedges : list, max_changes = 15) :
     else : # dissociate
         pass
 
-def convert_to_hypergraph(edges_list):
-    hypergraph = []
+def convert_to_hyperedges(edges_list : list) -> tuple[list, list]:
+    """
+    
+    Parameters : 
+    --------------
+    
+    Returns : 
+    --------------
+    `hyperedges`:
+    `degrees`:"""
+    hyperedges = []
+    degrees = []
     for edge_list in edges_list : 
         for edge in edge_list : 
             i = edge[0]
             j = edge[-1]
-            hypergraph.append([(i,j)])
-    return hypergraph
+            hyperedges.append([(i,j)])
+            degrees.append(3)
+    return hyperedges, degrees
 
-def modified_metropolis_hastings(hyperedges, edges_list, degrees, junctions_indices, Tinit : float = 1, flip_proba = 0.3):
+def hyperedges_fit_bezier(edges_list : list, hyperedges : list, degrees : list, width):
+    for i in range(len(hyperedges)) :
+        degree = degrees[i]
+        hyperedge = hyperedges[i]
+        for pair in hyperedge :
+            start = pair[0]
+            end = pair[1]
+            edge = 0
+            for e in edges_list[start]:
+                if e[-1] == end :
+                    edge = edges_list
+                    break
+            if edge == 0 : 
+                raise Exception("issue while finding the corresponding edge ({},{}).".format(start,end))
+                exit(0)
+            if degree == 1 : 
+                pass
+
+            elif degree == 2 :
+                p1 = skeleton.local_extrema(edge, start, end)
+                p0 = (start//width, start%width)
+                p3 = (end//width, end%width)
+                norm = len(edge)
+                for i in range(norm):
+                    tp = i/norm
+                    
+
+
+
+            elif degree == 3:
+                control_points = skeleton.get_control_points_bezier(edge, start, end, width)
+                norm = len(edge)
+                for i in range(norm) :
+                    tp =i/norm
+                    bezier = skeleton.bezier_curve(tp, control_points)
+
+
+def modified_metropolis_hastings(skeleton, edges_list : list, junctions_indices : list, Tinit : float = 1, flip_proba = 0.3):
     """
     
     Parameters : 
@@ -218,15 +273,16 @@ def modified_metropolis_hastings(hyperedges, edges_list, degrees, junctions_indi
     if len(junctions_indices) < 1 : 
         raise Exception("graph is empty")
         exit(0)
-    hyperedges = convert_to_hypergraph(edges_list)
+    hyperedges, degrees = convert_to_hyperedges(edges_list)
     T = Tinit
     V = len(junctions_indices)
     C = 0.999**(1/V)
     T_end = C**10000
+    width = len(skeleton[0])
     while T > T_end : 
         perturbation_operator = np.random.randint(0, 3)
         if perturbation_operator == 0 : 
             hyperedges, degrees = merge_and_split(hyperedges, degrees, edges_list)
         elif perturbation_operator == 1 : 
             degrees = degree_switch(degrees, flip_proba)
-            
+

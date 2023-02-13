@@ -277,7 +277,7 @@ def get_edges(G, junction_indices) :
 
 def local_extrema(edge : list, start : int, end : int, width : int) :
     """
-    Takes the segment going from `start` and `end` and gets the point in """
+    Takes the segment going from `start` and `end` and gets the point in image coordinates (i,j) """
     max_dist = 0
     extrema = (start//width, start%width)
     y_extr = start//width
@@ -363,20 +363,33 @@ def bezier_curve(tp : tuple, control_points : list):
     Returns : 
     ------------------
     Coordinates of the point on the Bezier curve for normalized input tp."""
-
-    p0 = control_points[0]
-    p1 = control_points[1]
-    p2 = control_points[2]
-    p3 = control_points[3]
-    #since edges are oriented in my construction (exist 2 times) 
-    # I must get the same bezier curve for both edges and that means choosing one configuration for the polynom
-    # I decide to always take the one obtained with the edge whose starting point is the closest to the origin
-    if np.sqrt(p0[0]**2 + p0[1]**2) < np.sqrt(p3[0]**2+p3[1]**2):
-        x = (1-tp)**3*p0[0] + 3*tp*(1-tp)**2*p1[0] + 3*tp**2*(1-tp)*p2[0] + tp**3*p3[0]
-        y = (1-tp)**3*p0[1] + 3*tp*(1-tp)**2*p1[1] + 3*tp**2*(1-tp)*p2[1] + tp**3*p3[1]
-    else : 
-        x = (1-tp)**3*p3[0] + 3*tp*(1-tp)**2*p1[0] + 3*tp**2*(1-tp)*p2[0] + tp**3*p0[0]
-        y = (1-tp)**3*p3[1] + 3*tp*(1-tp)**2*p1[1] + 3*tp**2*(1-tp)*p2[1] + tp**3*p0[1]
+    degree = len(control_points)-1
+    if degree == 3 : 
+        p0 = control_points[0]
+        p1 = control_points[1]
+        p2 = control_points[2]
+        p3 = control_points[3]
+        #since edges are oriented in my construction (exist 2 times) 
+        # I must get the same bezier curve for both edges and that means choosing one configuration for the polynom
+        # I decide to always take the one obtained with the edge whose starting point is the closest to the origin
+        if np.sqrt(p0[0]**2 + p0[1]**2) < np.sqrt(p3[0]**2+p3[1]**2):
+            x = (1-tp)**3*p0[0] + 3*tp*(1-tp)**2*p1[0] + 3*tp**2*(1-tp)*p2[0] + tp**3*p3[0]
+            y = (1-tp)**3*p0[1] + 3*tp*(1-tp)**2*p1[1] + 3*tp**2*(1-tp)*p2[1] + tp**3*p3[1]
+        else : 
+            x = (1-tp)**3*p3[0] + 3*tp*(1-tp)**2*p1[0] + 3*tp**2*(1-tp)*p2[0] + tp**3*p0[0]
+            y = (1-tp)**3*p3[1] + 3*tp*(1-tp)**2*p1[1] + 3*tp**2*(1-tp)*p2[1] + tp**3*p0[1]
+    elif degree == 2 : 
+        p0 = control_points[0]
+        p1 = control_points[1]
+        p2 = control_points[2]
+        if np.sqrt(p0[0]**2 + p0[1]**2) < np.sqrt(p2[0]**2+p2[1]**2):
+            x = (1-tp)**2*p0[0] + 2*tp*(1-tp)*p1[0] + tp**2*p2[0]
+            y = (1-tp)**2*p0[1] + 2*tp*(1-tp)**p1[1] + tp**2*p2[1]
+        else : 
+            x = (1-tp)**2*p2[0] + 2*tp*(1-tp)*p1[0]+ tp**2*p0[0]
+            y = (1-tp)**2*p2[1] + 2*tp*(1-tp)**p1[1] + tp**2*p0[1]
+    elif degree ==1 
+        
     return (x,y)
 
 
