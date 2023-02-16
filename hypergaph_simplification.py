@@ -276,7 +276,7 @@ def hyperedges_fit_bezier(edges_list : list, hyperedges : list, degrees : list, 
     return x, y
 
 
-def modified_metropolis_hastings(skeleton, edges_list : list, junctions_indices : list, Tinit : float = 1, flip_proba = 0.3, mu = 1, alpha = 0.5):
+def modified_metropolis_hastings(skeleton, edges_list : list, junctions_indices : list, Tinit : float = 1, flip_proba = 0.3, mu = 0.4, alpha = 0.05):
     """
     
     Parameters : 
@@ -295,7 +295,7 @@ def modified_metropolis_hastings(skeleton, edges_list : list, junctions_indices 
     T = Tinit
     V = len(junctions_indices)
     C = 0.999**(1/V)
-    T_end = C**10000
+    T_end = C**25000
     width = len(skeleton[0])
     i = 1
     while T > T_end : 
@@ -328,7 +328,7 @@ def modified_metropolis_hastings(skeleton, edges_list : list, junctions_indices 
 
 test = True
 if test : 
-    name = 'croix'
+    name = 'boule'
     img, edges_list, junctions_indices = skeleton.test(name)
     width = len(img[0])
     print("computing hyperedges...")
@@ -339,7 +339,7 @@ if test :
     x, y = hyperedges_fit_bezier(edges_list, hyperedges, degrees, width, junctions_indices)
     print("done.\n")
     fig = plt.figure(figsize=(15,15))
-    plt.plot(y, x, 'bo', ms = 0.1)
+    plt.plot(y, x, color='black', marker = 'o', linestyle ='none', ms = 1)
     ax = plt.gca()
     ax.set_xlim(0,len(img[0]))
     ax.set_ylim(len(img),0)

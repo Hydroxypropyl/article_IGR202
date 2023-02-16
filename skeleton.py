@@ -646,7 +646,7 @@ def test(img_name) :
     if True :
         curves = compute_bezier_curve(edges_list, junctions_indices, len(skeleton[0]))
         fig = plt.figure(figsize=(15, 15))
-        plt.plot(curves[1], curves[0], 'bo', ms=0.08)
+        plt.plot(curves[1], curves[0], color = 'black', marker = 'o', linestyle = 'none', ms=1)
         ax = plt.gca()
         ax.set_xlim(0,len(skeleton[0]))
         ax.set_ylim(len(skeleton),0)
