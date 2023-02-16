@@ -274,10 +274,19 @@ def get_edges(G, junction_indices) :
     return edges_list
 
 
-
-def local_extrema(edge : list, start : int, end : int, width : int) :
+def local_extrema(edge : list, start : int, end : int, width : int) -> tuple [float, float] :
     """
-    Takes the segment going from `start` and `end` and gets the point in image coordinates (i,j) """
+
+    Parameters : 
+    -------------
+    `edge` : the list of flattened coordinates of all the pixels in the edge between `start` and `end`.
+    `start` : the start point of the edge, in flattened coordinates. 
+    `end` : the end point of the edge, in flatttened coordinates.
+    `width` : the width of the image the computation is done for. This is used to convert the flattened coordinates into image coordinates.
+    
+    Returns :
+    ------------
+    `(x,y)` : the image coordinates (can be float) of the point the furthest away from the straight line from start to end. """
     max_dist = 0
     extrema = (start//width, start%width)
     y_extr = start//width
@@ -300,28 +309,36 @@ def local_extrema(edge : list, start : int, end : int, width : int) :
     return extrema
 
 
-def get_control_points_bezier(edge : list, P0 : int, P3 : int, width : int) -> list:
+def get_control_points_bezier(edge : list, P0 : int, P3 : int, width : int, deg = 3) -> list:
     """
-    Computes the control points for a Bezier curve by using start (`P0`) and end (`P3`) points and furthest point from segment[`P0`, `P3`].
+    Computes the control points for a Bezier curve of degree `deg` by using start (`P0`) and end (`P3`) points.
     
     Parameters : 
     ----------------
     `edge` : list of coordinates of pixels belonging to the edge
     `P0` : start point coordinates in flattened image
     `P3` : end point coordinates in flattened image
-    
+    `width` : width of the image, used to convert the coordinates into image coordinates.
+    `deg` : the degree of the bezier curve. By default, the control points are determined for a degree 3 curve (so 4 control points).
+
     Returns : 
     ----------------
-    `coordinates` : list of coordinates of P0, P1, P2, P3 in skeleton. P0 and P3 have integer coordinates, P1 and P2 may not.
+    `coordinates` : list of coordinates of the control points in image coordinates. \n
+    If deg == 1 then the control points are the start and end point.\n
+    If deg == 2 then an additional control point is added, being the point of maximum distance from the straight line[P0, P3]. 
+    If deg == 3 then a total of 4 control points is outputed.
     """
     coordinates = [(P0//width, P0%width)]
-
     smoothness = 0.3
     y0 = P0//width
     x0 = P0%width
     y3 = P3//width
     x3 = P3%width
-    if len(edge) > 5:
+    if deg != 1 and deg != 2 and deg != 3 : 
+        raise Exception("program can only compute the control points for bezier curves of degree 1 to 3 included. Degree given is {}".format(deg))
+    if deg == 2 : 
+        coordinates.append(local_extrema(edge, P0, P3, width))
+    elif deg == 3 : 
         extrema = local_extrema(edge, P0, P3, width)
         #print("P0, P3, extrema", P0, P3, extrema)
         ym = extrema[0]
@@ -341,12 +358,9 @@ def get_control_points_bezier(edge : list, P0 : int, P3 : int, width : int) -> l
         p2x = xm + fb*abs(x3-x0)
         p2y = ym + fb*abs(y3-y0)  
         #print("d01 {} d12 {} fa {} fb {} p1x {} p1y {} p2x {} p2y {}".format(d01, d12, fa, fb, p1x, p1y, p2x, p2y))
-
         coordinates.append((p1y, p1x))
         coordinates.append((p2y, p2x))
-    else : 
-        coordinates.append((y0, x0))
-        coordinates.append((y3,x3))
+    #
     coordinates.append((y3, x3))
     return coordinates
 
@@ -388,7 +402,15 @@ def bezier_curve(tp : tuple, control_points : list):
         else : 
             x = (1-tp)**2*p2[0] + 2*tp*(1-tp)*p1[0]+ tp**2*p0[0]
             y = (1-tp)**2*p2[1] + 2*tp*(1-tp)**p1[1] + tp**2*p0[1]
-    elif degree ==1 
+    elif degree ==1 :
+        p0 = control_points[0]
+        p1 = control_points[1]
+        if np.sqrt(p0[0]**2 + p0[1]**2) < np.sqrt(p1[0]**2+p1[1]**2):
+            x = (1-tp)*p0[0] + tp*p1[0]
+            y = (1-tp)*p0[1] + tp*p1[1]
+        else : 
+            x = (1-tp)*p1[0] + tp*p0[0]
+            y = (1-tp)*p1[1] + tp*p0[1]
         
     return (x,y)
 
@@ -463,7 +485,7 @@ def fitting_error(edge : list, control_points : list, width : int) -> float:
     return sum
 
 
-def fit_bezier_curve(edge : list, start :int, end : int, junction_coordinates :list, width : int, threshold = 300) -> list :
+def fit_bezier_curve(edge : list, start :int, end : int, junction_coordinates :list, width : int, threshold = 100) -> list :
     """
     Takes `edge` and recursively fits Bezier curve on different segments by splitting in new segments, in order to get a fitting error below `threshold`.
     Parameters : 
@@ -557,7 +579,7 @@ def topological_graph(skeleton, name) -> tuple[list, list] :
     new_nodes_coordinates = nodes_coordinates.copy()
     n = len(nodes_coordinates)
     for i in range(len(edges_list)) :
-        print("fitting edge {} out of {}".format(i, n))
+        print("fitting edge {} out of {}".format(i+1, n))
         edges = edges_list[i]
         for edge in edges : 
             start = edge[0]
@@ -571,8 +593,8 @@ def topological_graph(skeleton, name) -> tuple[list, list] :
     return junctions_coordinates, final_edges, junctions_indices
 
 
-def test() :
-    name = 'coffee_machine'
+def test(img_name) :
+    name = img_name
     image = cv.imread("results/" + name +"_no_contour.png")
     image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 
@@ -621,18 +643,19 @@ def test() :
     plt.title("final nodes")
     plt.show()
     cv.imwrite("results/"+name+"_nodes_bezier.png", new_img)
-    curves = compute_bezier_curve(edges_list, junctions_indices, len(skeleton[0]))
-    fig = plt.figure()
-    plt.plot(curves[1], curves[0], 'bo', ms=0.08)
-    ax = plt.gca()
-    ax.set_xlim(0,len(skeleton[0]))
-    ax.set_ylim(len(skeleton),0)
-    ax.set_aspect('equal', adjustable='box')
-    plt.title("bezier curves")
-    plt.savefig("results/"+name+"_bezier_curves.png")
-    plt.show()
+    if True :
+        curves = compute_bezier_curve(edges_list, junctions_indices, len(skeleton[0]))
+        fig = plt.figure(figsize=(15, 15))
+        plt.plot(curves[1], curves[0], 'bo', ms=0.08)
+        ax = plt.gca()
+        ax.set_xlim(0,len(skeleton[0]))
+        ax.set_ylim(len(skeleton),0)
+        ax.set_aspect('equal', adjustable='box')
+        plt.title("bezier curves")
+        plt.savefig("results/"+name+"_bezier_curves.png")
+        plt.show()
+    return skeleton, edges_list, junctions_indices
 
-test()
 
 
 ###debug control points and Bezier
