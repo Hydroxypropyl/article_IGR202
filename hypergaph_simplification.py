@@ -14,8 +14,9 @@ def fidelity_energy(width : int, hyperedges : list, junctions_indices : list, ed
     -------------
     `width` : 
     `hyperedges` : the hyperedges. Coordinates are in flattened image.
-    `junctions_indices` : 
-    `edges_list` : 
+    `junctions_indices` : indices of the junctions in the flattened image.
+    `edges_list` : a list of same shape as `junction_coordinates`, where edges_list[i] is the list of edges(all the pixels) for pixel at `junction_coordinates[i]`. 
+    Edges contain the coordinates of the pixels.
     `degrees` : degrees of the hyperedges.
     
     Returns : 
@@ -72,7 +73,7 @@ def trade_off_energy(width, junctions_indices, hyperedges : list, mu : float, al
     Parameters :
     ----------------
     `skeleton`: image in black and white, [0, 255]
-    `hyperedges`:
+    `hyperedges`: the hyperedges. Coordinates are in flattened image.
     `mu`: the coefficient used to compute the simplicity energy. 
     The higher mu is, the more Bezier curves with low degrees are favored.
     `alpha`: the coefficient used to ponder energies to compute the trade-off energy.
@@ -93,7 +94,7 @@ def merge_and_split(hyperedges: list, degrees : list, max_changes : int = 20) ->
     
     Parameters:
     --------------
-    `hyperedges`: list of hyperedges.
+    `hyperedges`:  the hyperedges. Coordinates are in flattened image.
     `degrees`: the degrees of the hyperedges.
     `max_changes` : upper bound for the random generation of the number of changes to do.
     By default, `max_changes` = 20.
@@ -208,18 +209,22 @@ def degree_switch(degrees : list, proba : float) -> list:
     return degrees
                 
 
-def convert_to_hyperedges(edges_list : list, default_degree = 3) -> tuple[list, list]:
+def convert_to_hyperedges(edges_list : list, default_degree :int = 3) -> tuple[list, list]:
     """
-    
+    Takes the edges and converts them all to an hyperedge.
+
     Parameters : 
     --------------
-    `edges_list` : 
-    `default_degree` : 
+    `edges_list` : a list of same shape as `junction_coordinates`, where edges_list[i] is the list of edges(all the pixels) for pixel at `junction_coordinates[i]`. 
+    Edges contain the coordinates of the pixels.
+    `default_degree` : degree used to initialize the degree of the Bezier curves for the hyperedges.
+    Must be equal to 1, 2 or 3.
     By default, `default_degree` = 3.
+
     Returns : 
     --------------
-    `hyperedges`:
-    `degrees`:
+    `hyperedges`:  the hyperedges. Coordinates are in flattened image.
+    `degrees`: list of same length as `hyperedges` containing the value `default_degree`
     """
     hyperedges = []
     for edge_list in edges_list : 
@@ -237,13 +242,19 @@ def convert_to_hyperedges(edges_list : list, default_degree = 3) -> tuple[list, 
 
 def hyperedges_fit_bezier(edges_list : list, hyperedges : list, degrees : list, width : int, junctions_indices):
     """
-    
+    Computes the Bezier curves on all the hyperedges.
     Parameters : 
     --------------
-    
+    `edges_list`: a list of same shape as `junction_coordinates`, where edges_list[i] is the list of edges(all the pixels) for pixel at `junction_coordinates[i]`. 
+    Edges contain the coordinates of the pixels.
+    `hyperedges` :  the hyperedges. Coordinates are in flattened image.
+    `degrees` : degrees of the hyperedges
     `width` : width of the image, used to convert the coordinates into image coordinates.
+    `junctions_indices` : indices of the junctions in the flattened image.
     Returns : 
     --------------
+    (x,y) : 
+
     """
     x = []
     y = []
@@ -272,15 +283,18 @@ def hyperedges_fit_bezier(edges_list : list, hyperedges : list, degrees : list, 
     return x, y
 
 
-def modified_metropolis_hastings(skeleton, edges_list : list, junctions_indices : list, Tinit : float = 1, flip_proba = 0.3, mu = 0.8, alpha = 0.1, nb_iterations = 10000):
+def modified_metropolis_hastings(skeleton : list, edges_list : list, junctions_indices : list, Tinit : float = 1, flip_proba = 0.3, mu = 0.3, alpha = 0.1, nb_iterations = 2000):
     """
     Applies the modified version of the metropolis-Hastings algorithm in order to perturbate the hypergraph.
-    The goal is to minimize an energy representing the distance between the skeleton and the approximation with Bezier curves.
+    The goal is to minimize an energy representing the distance between the skeleton and the approximation 
+    with Bezier curves.
+
     Parameters : 
     --------------
     `skeleton` : image in black and white, [0, 255]
-    `edges_list` : 
-    `junctions_indices` : 
+    `edges_list` : a list of same shape as `junction_coordinates`, where edges_list[i] is the list of edges(all the pixels) for pixel at `junction_coordinates[i]`. 
+    Edges contain the coordinates of the pixels.
+    `junctions_indices` : indices of the junctions in the flattened image.
     `Tinit` : the initial temperature. By default, `Tinit` = 1.
     `flip_proba` : the probabilty of a hyperedge's degree to be flipped if the perturbation operator is flip. 
     By default, `flip_proba` = 0.3.
@@ -291,8 +305,7 @@ def modified_metropolis_hastings(skeleton, edges_list : list, junctions_indices 
     The higher alpha is, the more the simplicity energy impacts the overall energy.
     By default, `alpha` is equal to 0.1.
     `nb_iterations` : number of times a new configuration for the hypergraph should be tested.
-    By default, `nb_iterations` is equal to 10,000.
-
+    By default, `nb_iterations` is equal to 2,000.
     
     Returns : 
     --------------
@@ -303,6 +316,7 @@ def modified_metropolis_hastings(skeleton, edges_list : list, junctions_indices 
     if len(junctions_indices) < 1 : 
         raise Exception("graph is empty")
         exit(0)
+    print("applying metropolis-hastings...")
     hyperedges, degrees = convert_to_hyperedges(edges_list)
     T = Tinit
     V = len(junctions_indices)
@@ -319,7 +333,7 @@ def modified_metropolis_hastings(skeleton, edges_list : list, junctions_indices 
         potential_degrees = 0
         if perturbation_operator == 0 : 
             #print("im in mode 0")
-            potential_hyperedges, potential_degrees = merge_and_split(hyperedges.copy(), degrees.copy(), edges_list)
+            potential_hyperedges, potential_degrees = merge_and_split(hyperedges.copy(), degrees.copy())
         elif perturbation_operator == 1 : 
             #print("I'm in mode 1")
             potential_degrees = degree_switch(degrees.copy(), flip_proba)
@@ -334,30 +348,33 @@ def modified_metropolis_hastings(skeleton, edges_list : list, junctions_indices 
         if i//1000*1000 == i : #to only print every 1000 iteration
             print("{}th iteration. There are {} hyperedges. Energy is {}.\n".format(i, len(hyperedges), energy))
         i += 1
+    print("Finished applying metropolis-hastings...")
     return hyperedges, degrees
 
-name = 'croix'
+name = 'boule' #can be 'croix', 'boule', 'dino', 'plot'
 img, edges_list, junctions_indices = skeleton.test(name)
 width = len(img[0])
-print("applying metropolis-hastings...")
 if name == 'croix': 
-    hyperedges, degrees = modified_metropolis_hastings(img, edges_list, junctions_indices, mu=0.8, alpha = 0.6)
+    #to show limits of algorithm
+    hyperedges, degrees = modified_metropolis_hastings(img, edges_list, junctions_indices, mu=0.4, alpha = 0.6)
 elif name == 'boule':
-    hyperedges, degrees = modified_metropolis_hastings(img, edges_list, junctions_indices)
+    hyperedges, degrees = modified_metropolis_hastings(img, edges_list, junctions_indices,alpha = 0.3, nb_iterations = 15000)
 elif name == 'plot' :
-    hyperedges, degrees = modified_metropolis_hastings(img, edges_list, junctions_indices, mu = 0.8, nb_iterations=2000)
-    print("done.\n")
-    print("number of edges : {}; number of hyperedges : {}".format(len(edges_list), len(hyperedges)))
-    print("computing the final bezier curves...")
-    x, y = hyperedges_fit_bezier(edges_list, hyperedges, degrees, width, junctions_indices)
-    print("done.\n")
+    hyperedges, degrees = modified_metropolis_hastings(img, edges_list, junctions_indices, mu = 0.8)
+elif name == 'dino':
+    hyperedges, degrees = modified_metropolis_hastings(img, edges_list, junctions_indices, mu = 0.8)
+print("number of edges : {}; number of hyperedges : {}".format(len(edges_list), len(hyperedges)))
 
-    fig = plt.figure(figsize=(15, 15))
-    plt.plot(y, x, color='black', marker = 'o', linestyle ='none', ms = 0.5)
-    ax = plt.gca()
-    ax.set_xlim(0,len(img[0]))
-    ax.set_ylim(len(img),0)
-    ax.set_aspect('equal', adjustable='box')
-    plt.title("final bezier curves : {} hyperedges".format(len(hyperedges)))
-    plt.savefig("results/"+name+"_final_result.png")
-    plt.show()
+print("computing the final bezier curves...")
+x, y = hyperedges_fit_bezier(edges_list, hyperedges, degrees, width, junctions_indices)
+print("done.\n")
+
+fig = plt.figure(figsize=(15, 15))
+plt.plot(y, x, color='black', marker = 'o', linestyle ='none', ms = 0.5)
+ax = plt.gca()
+ax.set_xlim(0,len(img[0]))
+ax.set_ylim(len(img),0)
+ax.set_aspect('equal', adjustable='box')
+plt.title("final bezier curves : {} hyperedges".format(len(hyperedges)))
+plt.savefig("results/"+name+"_final_result.png")
+plt.show()

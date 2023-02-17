@@ -12,9 +12,10 @@ import skimage.io
 from itertools import islice
 
 
-def get_skeleton(img) :
+def get_skeleton(img) -> list:
     """
-    This function takes as input the trapped ball segmented image. It then computes the skeleton by intersecting iteratively all the zones.
+    This function takes as input the trapped ball segmented image. 
+    It then computes the skeleton by intersecting iteratively all the zones.
     Parameters : 
     -----------------
     `img` : the image for the skeleton extraction. Must be black lines on white background.
@@ -48,9 +49,10 @@ def open_curves(skeleton, img):
     pass
     ##TODO
 
-def is_junction(skeleton, pixel : tuple) :
+def is_junction(skeleton : list, pixel : tuple) :
     """
-    Checks whether a certain pixel is a junction node. A pixel is considered junction if it has at least three neighbour in 4-connexity.
+    Checks whether a certain pixel is a junction node. 
+    A pixel is considered junction if it has at least three neighbour in 4-connexity.
     
     Parameters :
     --------------
@@ -59,7 +61,8 @@ def is_junction(skeleton, pixel : tuple) :
     
     Returns : 
     --------------
-    `True` if `pixel` is a T, X or Y junction, `False` otherwise."""
+    `True` if `pixel` is a T, X or Y junction, `False` otherwise.
+    """
     x = pixel[0]
     y = pixel[1]
     color = skeleton[x,y]
@@ -71,7 +74,7 @@ def is_junction(skeleton, pixel : tuple) :
         return False
 
 
-def get_junctions(skeleton) :
+def get_junctions(skeleton : list) -> list:
     """
     Goes through `skeleton` and determines which pixels are junction pixels.
     Parameters : 
@@ -94,7 +97,7 @@ def get_junctions(skeleton) :
     return junctions_coordinates
 
 
-def neighbours_4_connexity(img, p_i : int, p_j : int):
+def neighbours_4_connexity(img : list, p_i : int, p_j : int) -> list:
     """
     Computes the neighbours in 4-connexity in the image. 
     Img must be black and white and neighbours are those of same color as pixel p.
@@ -119,7 +122,7 @@ def neighbours_4_connexity(img, p_i : int, p_j : int):
     return neighbours
 
 
-def get_neighbours_and_edges(skeleton, junction_coordinates : list) -> tuple[list, list]:
+def get_edges(skeleton : list, junction_coordinates : list) -> tuple[list, list]:
     """
     Computes the edges determined by white pixels in `skeleton`.
     
@@ -130,26 +133,24 @@ def get_neighbours_and_edges(skeleton, junction_coordinates : list) -> tuple[lis
     
     Returns : 
     -------------------
-    `junction_neighbours` : same length as `junction_coordinates`. 
-    ith element contains the list of junctions connected by an edge to junction[i].
-    Neighbours correspond to their index in `junction_coordinates`.
-    `edges_list` : a list of same length as `junction_coordinates`, where edges_list[i] is the list of edges(all the pixels) for junction_coordinates[i]. 
+    `edges_list` : a list of same length as `junction_coordinates`, 
+    where edges_list[i] is the list of edges(all the pixels) for junction_coordinates[i]. 
     Edges contain the coordinates of the pixels and contain their start and end pixels.
     """
-
+    print("Computing edges list...")
     edges_list =[]
     junction_neighbours=[]
     width = len(skeleton[0])
     i = 1
     for junction in junction_coordinates : 
-        print("junction {} out of {}".format(i, len(junction_coordinates)))
+        #print("junction {} out of {}".format(i, len(junction_coordinates)))
         i += 1
         #get neighbours : 
         edges = []
         junction_neighbours = neighbours_4_connexity(skeleton, junction[0], junction[1])
         nb_potential_edges = len(junction_neighbours)
         j = 1
-        print("{} potential edges to check.".format(nb_potential_edges))
+        #print("{} potential edges to check.".format(nb_potential_edges))
         for n in range(nb_potential_edges) : 
             edge = [junction[0]*width +junction[1], junction_neighbours[n][0]*width + junction_neighbours[n][1]]
 
@@ -168,7 +169,6 @@ def get_neighbours_and_edges(skeleton, junction_coordinates : list) -> tuple[lis
                     print(skeleton[y-1: y+2, x-1:x+2])
                     not_edge = True
                 else : 
-
                     for nbr in neighbours :
                         if nbr != last_neighbour:
                             edge.append(nbr[0]*width + nbr[1])
@@ -177,10 +177,10 @@ def get_neighbours_and_edges(skeleton, junction_coordinates : list) -> tuple[lis
                 edges.append(edge)
         #print("computed the edges for junction {}".format(i-1))
         edges_list.append(edges)
+    print("Done.")
     return edges_list
-
- #%%           
-def flatten_coordinates(width, junction_coordinates : list):
+        
+def flatten_coordinates(width : int, junction_coordinates : list)-> list:
     """
     Parameters : 
     ---------------
@@ -347,7 +347,7 @@ def compute_bezier_curve(edges_list : list, junctions_indices : list , width : i
     Parameters : 
     ----------------
     `edges_list` : 
-    `junctions_indices` : 
+    `junctions_indices` : indices of the junctions in the flattened image.
     `width` : width of the image, used to convert the coordinates into image coordinates.
 
     Returns : 
@@ -405,7 +405,8 @@ def fitting_error(edge : list, control_points : list, width : int) -> float:
 
 def fit_bezier_curve(edge : list, start :int, end : int, junction_coordinates :list, width : int, threshold = 100) -> list :
     """
-    Takes `edge` and recursively fits Bezier curve on different segments by splitting in new segments, in order to get a fitting error below `threshold`.
+    Takes `edge` and recursively fits Bezier curve on different segments by splitting in new segments, 
+    in order to get a fitting error below `threshold`.
     Parameters : 
     ---------------------
     `edge` : all the coordinates of the pixels on the edge between `start` and `end`, in topological order.
@@ -417,7 +418,8 @@ def fit_bezier_curve(edge : list, start :int, end : int, junction_coordinates :l
     
     Returns : 
     --------------------
-    `junction_coordinates` : the updated junction coordinates such that the fitting error of all Bezier curve is less than 2 pixels.
+    `junction_coordinates` : the updated junction coordinates such that the fitting error of a curve
+     is less than `threshold`.
     """
 
     if len(edge)> 10 :     
@@ -443,21 +445,20 @@ def fit_bezier_curve(edge : list, start :int, end : int, junction_coordinates :l
     return junction_coordinates
 
 
-def topological_graph(skeleton, name) -> tuple[list, list] : 
+def topological_graph(skeleton : list , name) -> tuple[list, list] : 
     """
     
     Parameters : 
     -----------------
     `skeleton` : image in black and white, [0, 255]
+    `name` : name of the file. Used to save the differents plots.
     
     Returns : 
     -----------------
     `junction_coordinates` : the coordinates in `skeleton` of the nodes
-    `nodes_neighbours` : same shape as `nodes_coordinates`. 
-    ith element contains the list of nodes connected by an edge to pixel at nodes_coordinates[i].
-    Neighbours correspond to their index in `nodes_coordinates`.
     `edges_list` : a list of same shape as `junction_coordinates`, where edges_list[i] is the list of edges(all the pixels) for pixel at `junction_coordinates[i]`. 
     Edges contain the coordinates of the pixels.
+    `junctions_indices` : indices of the junctions in the flattened image.
 
     """
 
@@ -475,10 +476,10 @@ def topological_graph(skeleton, name) -> tuple[list, list] :
     print("Done. Number of junctions identified : {} \n".format(len(nodes_coordinates)))
 
     print("getting neighbours and edges...")
-    #junction_neighbours, edges_list = get_neighbours_and_edges(skeleton, nodes_coordinates)
-    G, junctions_indices = flatten_coordinates(skeleton, nodes_coordinates)
+    #junction_neighbours, edges_list = get_edges(skeleton, nodes_coordinates)
+    junctions_indices = flatten_coordinates(width, nodes_coordinates)
     #edges_list = get_edges(G, junctions_indices)
-    edges_list = get_neighbours_and_edges(skeleton, nodes_coordinates)
+    edges_list = get_edges(skeleton, nodes_coordinates)
     #### Check number of final edges
     size = 0
     for edge_list in edges_list :
@@ -492,8 +493,10 @@ def topological_graph(skeleton, name) -> tuple[list, list] :
     plt.imshow(new_img)
     plt.title("edges")
     plt.show()
+
     print("Done.")
     print("Going to fit Bezier curves on the edges to get the best nodes. \n")
+
     new_nodes_coordinates = nodes_coordinates.copy()
     n = len(nodes_coordinates)
     for i in range(len(edges_list)) :
@@ -503,11 +506,11 @@ def topological_graph(skeleton, name) -> tuple[list, list] :
             start = edge[0]
             #print("edge size : ", len(edge))
             new_nodes_coordinates = fit_bezier_curve(edge, start, edge[-1], new_nodes_coordinates, width)
-    #nodes_neighbours, edges_list = get_neighbours_and_edges(skeleton, new_nodes_coordinates)
-    G, junctions_indices = flatten_coordinates(skeleton, new_nodes_coordinates)
+    #nodes_neighbours, edges_list = get_edges(skeleton, new_nodes_coordinates)
+    junctions_indices = flatten_coordinates(width, new_nodes_coordinates)
     print("Final number of nodes : {}".format(len(new_nodes_coordinates)))
     junctions_coordinates = [(i//width, i%width) for i in junctions_indices]
-    final_edges = get_neighbours_and_edges(skeleton, junctions_coordinates)
+    final_edges = get_edges(skeleton, junctions_coordinates)
     return junctions_coordinates, final_edges, junctions_indices
 
 
@@ -528,6 +531,7 @@ def test(img_name) :
     nodes_coordinates, edges_list, junctions_indices = topological_graph(skeleton, name)
 
 #### Check number of final edges
+    debugging_final_edges = False
     if debugging_final_edges : 
         nodes_coordinates = np.array(nodes_coordinates)
         size = 0
